@@ -25,8 +25,8 @@ initial begin
 
 	for (int i = 0; i < VALIDATIONS; i++) begin
 		{data, sum, key, round_ref} = test_vectors[i];
-		@(posedge clk)
 
+    	repeat(3) @(posedge clk);
 		assert (round == round_ref) else $error("Wrong result on test vector %d: round = %h, round_ref = %h", i, round, round_ref);
 	end
 
@@ -36,6 +36,7 @@ end
 always #5 clk = ~clk;
 
 tea_round dut (
+  .clk (clk),
   .idata (data),
   .sum (sum),
   .key (key),
