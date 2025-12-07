@@ -7,14 +7,14 @@ module tea_iterative (
 
   input logic [63:0] s_axis_tdata,
   input logic s_axis_tvalid,
-  output s_axis_tready,
+  output logic s_axis_tready,
 
   output logic [63:0] m_axis_tdata,
   output logic m_axis_tvalid,
   input logic m_axis_tready
 );
 
-  parameter [1:0] IDLE = 2'b00, ENC = 2'b01, DONE = 2'b10;
+  parameter [1:0] IDLE = 2'b00, ENC_1 = 2'b01, ENC_2 = 2'b10, DONE = 2'b11;
   logic [1:0] next_state, state = IDLE;
 
   logic [63:0] block, enc_block;
@@ -28,8 +28,9 @@ module tea_iterative (
   always @(*) begin
     next_state = state;
     case(state)
-      IDLE: if (s_axis_tvalid) next_state = ENC;
-      ENC: if (last_round) next_state = DONE;
+      IDLE: if (s_axis_tvalid) next_state = ENC_1;
+      ENC_1: next_state = ENC_2;
+      ENC_2: next_state = last_round ? DONE : ENC_1;
       DONE: if (m_axis_tready) next_state = IDLE;
       default: next_state = IDLE;
     endcase
@@ -50,7 +51,7 @@ module tea_iterative (
           counter <= 5'd0;
           if (s_axis_tvalid) block <= s_axis_tdata;
         end
-        ENC: begin
+        ENC_2: begin
           counter <= counter + 1;
           block <= enc_block;
         end
@@ -92,11 +93,12 @@ always @(*) begin
     5'd29: sum = 32'h8a8043ae;
     5'd30: sum = 32'h28b7bd67;
     5'd31: sum = 32'hc6ef3720;
-    default: sum = 32'h0;
+    default: sum = 32'h9e3779b9;
   endcase
 end
 
 tea_round round_inst (
+  .clk (clk),
   .idata (block),
   .sum (sum),
   .key (key),
@@ -104,7 +106,7 @@ tea_round round_inst (
 );
 
 assign m_axis_tdata = block;
-assign m_axis_tvalid = state == DONE;
-assign s_axis_tready = state == IDLE;
+assign m_axis_tvalid = (state == DONE);
+assign s_axis_tready = (state == IDLE);
 
 endmodule
